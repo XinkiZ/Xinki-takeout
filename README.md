@@ -1,0 +1,2 @@
+# Xinki-takeout
+Redis
