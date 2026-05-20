@@ -6,6 +6,7 @@ import com.sky.dto.DishPageQueryDTO;
 import com.sky.entity.Dish;
 import com.sky.enumeration.OperationType;
 import com.sky.vo.DishVO;
+import jdk.jshell.Snippet;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
@@ -87,4 +88,7 @@ public interface DishMapper {
      * @return
      */
     Integer countByMap(Map map);
+
+    @Select("select * from dish where status = #{status}")
+    List<Dish> listByStatus(Integer status);
 }

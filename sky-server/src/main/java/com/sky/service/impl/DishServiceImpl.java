@@ -15,19 +15,18 @@ import com.sky.mapper.DishFlavorMapper;
 import com.sky.mapper.DishMapper;
 import com.sky.mapper.SetmealDishMapper;
 import com.sky.mapper.SetmealMapper;
+import com.sky.mapper.CategoryMapper;
 import com.sky.result.PageResult;
 import com.sky.service.DishService;
+import com.sky.service.DishVectorStoreService;
 import com.sky.vo.DishVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.beans.Transient;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 @Service
@@ -42,6 +41,10 @@ public class DishServiceImpl implements DishService {
     private SetmealDishMapper setmealDishMapper;
     @Autowired
     private SetmealMapper setmealMapper;
+    @Autowired
+    private CategoryMapper categoryMapper;
+    @Autowired
+    private DishVectorStoreService dishVectorStoreService;
     /**
      * 新增菜品和对应口味
      * @param dishDTO
@@ -68,6 +71,10 @@ public class DishServiceImpl implements DishService {
         }
 
         log.info("新增菜品：{}", dishDTO);
+
+        if (dish.getStatus() == StatusConstant.ENABLE) {
+            syncDishToVectorStore(dish);
+        }
     }
 
 
@@ -115,7 +122,7 @@ public class DishServiceImpl implements DishService {
 
         dishFlavorMapper.deleteByDishIds(ids);
 
-
+        dishVectorStoreService.removeDishes(ids);
 
     }
 
@@ -159,6 +166,12 @@ public class DishServiceImpl implements DishService {
         BeanUtils.copyProperties(dishDTO,dish);
 
         dishMapper.update(dish);
+
+        if (dish.getStatus() == StatusConstant.ENABLE) {
+            syncDishToVectorStore(dish);
+        } else {
+            dishVectorStoreService.removeDish(dish.getId());
+        }
     }
 
     /**
@@ -188,6 +201,12 @@ public class DishServiceImpl implements DishService {
                 .status(status)
                 .build();
         dishMapper.update(dish);
+
+        if (status == StatusConstant.ENABLE) {
+            syncDishToVectorStore(dish);
+        } else {
+            dishVectorStoreService.removeDish(id);
+        }
 
         if(status == StatusConstant.DISABLE){
             //如果当前状态为 停售，那么需要将包含当前菜品的套餐也停售
@@ -230,5 +249,19 @@ public class DishServiceImpl implements DishService {
         return dishVOList;
     }
 
+    private void syncDishToVectorStore(Dish dish) {
+        try {
+            String categoryName = "未知分类";
+            if (dish.getCategoryId() != null) {
+                com.sky.entity.Category category = categoryMapper.getById(dish.getCategoryId());
+                if (category != null) {
+                    categoryName = category.getName();
+                }
+            }
+            dishVectorStoreService.syncDish(dish, categoryName);
+        } catch (Exception e) {
+            log.error("同步菜品到向量库失败, dishId={}", dish.getId(), e);
+        }
+    }
 
 }
